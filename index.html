@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>messages</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0e0e0e; --surface: #181818; --border: #2a2a2a;
+    --text: #e8e8e8; --muted: #555; --accent: #c8f07a; --radius: 14px;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-weight: 300;
+    min-height: 100vh; text-transform: lowercase;
+  }
+
+  .inbox-btn {
+    position: fixed; top: 32px; left: 28px;
+    background: none; border: none; color: var(--muted);
+    font-size: 0.75rem; font-family: 'DM Mono', monospace;
+    cursor: pointer; text-transform: lowercase;
+    transition: color .15s; padding: 4px; z-index: 5;
+  }
+  .inbox-btn:hover { color: var(--text); }
+
+  #view-send {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 20px; gap: 20px;
+  }
+  .input-bar {
+    display: flex; align-items: center;
+    background: var(--surface); border-radius: 999px;
+    padding: 10px 10px 10px 20px;
+    width: 100%; max-width: 520px; gap: 8px;
+  }
+  .input-bar input {
+    flex: 1; background: none; border: none; outline: none;
+    font-size: 0.88rem; font-family: 'DM Sans', sans-serif;
+    font-weight: 300; color: var(--text); text-transform: lowercase; min-width: 0;
+  }
+  .input-bar input::placeholder { color: var(--muted); }
+  .send-btn {
+    background: var(--accent); border: none; border-radius: 999px;
+    width: 34px; height: 34px; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; flex-shrink: 0;
+    transition: opacity .15s, transform .1s;
+  }
+  .send-btn:hover { opacity: .85; }
+  .send-btn:active { transform: scale(.93); }
+  .send-btn:disabled { opacity: .35; cursor: default; }
+  .send-btn svg { width: 14px; height: 14px; fill: #0e0e0e; }
+
+  .inbox-panel {
+    position: fixed; inset: 0; background: var(--bg);
+    z-index: 10; overflow-y: auto; padding: 48px 24px 80px;
+    transform: translateY(100%); transition: transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  .inbox-panel.open { transform: translateY(0); }
+
+  .inbox-header {
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 720px; margin: 0 auto 28px;
+  }
+  .inbox-header span { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+  .inbox-close {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 0.9rem; cursor: pointer;
+  }
+  .inbox-close:hover { color: var(--text); }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px; max-width: 720px; margin: 0 auto;
+  }
+  .msg-card {
+    aspect-ratio: 1/1; background: var(--surface); border-radius: 20px;
+    padding: 14px; cursor: pointer; display: flex; align-items: flex-start;
+    overflow: hidden; transition: background .15s; animation: fadeIn .25s ease;
+  }
+  .msg-card:hover { background: #202020; }
+  .msg-card span {
+    font-size: 0.75rem; color: var(--text); line-height: 1.45;
+    overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 5; -webkit-box-orient: vertical; word-break: break-word;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.65); z-index: 20;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface); border-radius: 20px;
+    padding: 28px; max-width: 400px; width: 100%;
+    font-size: 0.88rem; line-height: 1.6; color: var(--text);
+    word-break: break-word; position: relative; max-height: 80vh; overflow-y: auto;
+  }
+  .modal-close {
+    position: absolute; top: 14px; right: 16px;
+    background: none; border: none; color: var(--muted);
+    font-size: 0.9rem; cursor: pointer; font-family: 'DM Mono', monospace;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .choice-modal {
+    background: var(--surface); border-radius: 20px;
+    padding: 28px; max-width: 320px; width: 100%;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .choice-title {
+    font-size: 0.78rem; font-family: 'DM Mono', monospace;
+    color: var(--muted); margin-bottom: 2px;
+  }
+  .choice-btns { display: flex; gap: 8px; }
+  .choice-btn {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 11px;
+    font-size: 0.8rem; font-family: 'DM Mono', monospace;
+    color: var(--muted); cursor: pointer; transition: all .15s; text-transform: lowercase;
+  }
+  .choice-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .pw-modal {
+    background: var(--surface); border-radius: 20px;
+    padding: 28px; max-width: 320px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px; position: relative;
+  }
+  .pw-modal input {
+    background: var(--bg); border: none; border-radius: var(--radius);
+    padding: 11px 14px; font-size: 0.85rem; font-family: 'DM Mono', monospace;
+    color: var(--text); outline: none; width: 100%; letter-spacing: 0.1em;
+  }
+  .pw-modal input::placeholder { color: var(--muted); letter-spacing: 0; }
+  .pw-submit {
+    background: var(--accent); color: #0e0e0e; border: none;
+    border-radius: var(--radius); padding: 11px;
+    font-size: 0.8rem; font-family: 'DM Mono', monospace;
+    cursor: pointer; transition: opacity .15s; text-transform: lowercase;
+  }
+  .pw-submit:hover { opacity: .85; }
+  .pw-err {
+    font-size: 0.7rem; font-family: 'DM Mono', monospace;
+    color: #ff5555; display: none;
+  }
+  .pw-err.show { display: block; }
+
+  .private-indicator {
+    font-size: 0.65rem; font-family: 'DM Mono', monospace;
+    color: var(--accent); position: fixed; top: 32px; right: 28px;
+    display: none; z-index: 5;
+  }
+  body.private-mode .private-indicator { display: block; }
+</style>
+</head>
+<body>
+
+<button class="inbox-btn" onclick="toggleInbox()">inbox</button>
+<div class="private-indicator">private mode</div>
+
+<div id="view-send">
+  <div class="input-bar">
+    <input type="text" id="msg-input" placeholder="" maxlength="500">
+    <button class="send-btn" id="send-btn" onclick="promptChoice()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 12L22 2L14 22L11 13L2 12Z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="inbox-panel" id="inbox-panel">
+  <div class="inbox-header">
+    <span>inbox</span>
+    <button class="inbox-close" onclick="toggleInbox()">✕</button>
+  </div>
+  <div class="grid" id="msg-grid"></div>
+</div>
+
+<div class="overlay" id="overlay-read" onclick="closeRead(event)">
+  <div class="modal" id="modal-box">
+    <button class="modal-close" onclick="closeReadDirect()">✕</button>
+    <p id="modal-text"></p>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-choice">
+  <div class="choice-modal">
+    <div class="choice-title">send as</div>
+    <div class="choice-btns">
+      <button class="choice-btn" onclick="sendAs('public')">public</button>
+      <button class="choice-btn" onclick="sendAs('private')">private</button>
+    </div>
+    <button class="modal-close" style="position:absolute;top:14px;right:16px;" onclick="closeChoice()">✕</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-pw">
+  <div class="pw-modal">
+    <button class="modal-close" onclick="closePw()">✕</button>
+    <input type="password" id="pw-input" placeholder="password" maxlength="20">
+    <div class="pw-err" id="pw-err">wrong password</div>
+    <button class="pw-submit" onclick="submitPw()">enter</button>
+  </div>
+</div>
+
+<script>
+  const BIN_ID  = '6a1875d5ddf5aa59f770b5ea';
+  const API_KEY = '$2a$10$jHWMbBExEFMfeR9a2Ms89um6cscjnxHjIXYih4QT5Gb1C1zosBdNK';
+  const BASE    = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+  const HEADERS = { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY, 'X-Bin-Versioning': 'false' };
+  const PRIVATE_PW = '41149512';
+
+  let msgs = [];
+  let inboxLoaded = false;
+  let privateMode = false;
+  let pCount = 0, pTimer = null;
+
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'p') { pCount = 0; clearTimeout(pTimer); return; }
+    pCount++;
+    clearTimeout(pTimer);
+    pTimer = setTimeout(() => { pCount = 0; }, 2000);
+    if (pCount >= 5) {
+      pCount = 0;
+      if (!privateMode) {
+        document.getElementById('overlay-pw').classList.add('open');
+        setTimeout(() => document.getElementById('pw-input').focus(), 50);
+      } else {
+        privateMode = false;
+        document.body.classList.remove('private-mode');
+        inboxLoaded = false;
+      }
+    }
+  });
+
+  document.getElementById('msg-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') promptChoice();
+  });
+  document.getElementById('pw-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitPw();
+  });
+
+  function submitPw() {
+    const val = document.getElementById('pw-input').value;
+    const err = document.getElementById('pw-err');
+    if (val === PRIVATE_PW) {
+      privateMode = true;
+      document.body.classList.add('private-mode');
+      document.getElementById('pw-input').value = '';
+      err.classList.remove('show');
+      document.getElementById('overlay-pw').classList.remove('open');
+      inboxLoaded = false;
+    } else {
+      err.classList.add('show');
+    }
+  }
+  function closePw() {
+    document.getElementById('overlay-pw').classList.remove('open');
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-err').classList.remove('show');
+  }
+
+  function promptChoice() {
+    const text = document.getElementById('msg-input').value.trim();
+    if (!text) { document.getElementById('msg-input').focus(); return; }
+    document.getElementById('overlay-choice').classList.add('open');
+  }
+  function closeChoice() {
+    document.getElementById('overlay-choice').classList.remove('open');
+  }
+
+  async function sendAs(type) {
+    closeChoice();
+    const input = document.getElementById('msg-input');
+    const text  = input.value.trim();
+    if (!text) return;
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    try {
+      const record   = await fetchData();
+      const pub      = record.msgs || [];
+      const priv     = record.privmsgs || [];
+      if (type === 'public') pub.unshift({ id: Date.now(), text });
+      else                   priv.unshift({ id: Date.now(), text });
+      await fetch(BASE, {
+        method: 'PUT', headers: HEADERS,
+        body: JSON.stringify({ recs: record.recs || [], msgs: pub, privmsgs: priv })
+      });
+      input.value = '';
+    } catch(e) {}
+    btn.disabled = false;
+  }
+
+  function toggleInbox() {
+    const panel = document.getElementById('inbox-panel');
+    const opening = !panel.classList.contains('open');
+    panel.classList.toggle('open', opening);
+    if (opening && !inboxLoaded) {
+      fetchAndRenderAll();
+      inboxLoaded = true;
+    }
+  }
+
+  async function fetchData() {
+    const res  = await fetch(BASE + '/latest', { headers: HEADERS });
+    const data = await res.json();
+    return data.record || {};
+  }
+
+  async function fetchAndRenderAll() {
+    try {
+      const record = await fetchData();
+      msgs = privateMode ? (record.privmsgs || []) : (record.msgs || []);
+    } catch { msgs = []; }
+    renderGrid();
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('msg-grid');
+    grid.innerHTML = '';
+    msgs.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'msg-card';
+      card.innerHTML = '<span>' + esc(m.text) + '</span>';
+      card.onclick = () => openRead(m.text);
+      grid.appendChild(card);
+    });
+  }
+
+  function openRead(text) {
+    document.getElementById('modal-text').textContent = text;
+    document.getElementById('overlay-read').classList.add('open');
+  }
+  function closeRead(e) {
+    if (e.target === document.getElementById('overlay-read'))
+      document.getElementById('overlay-read').classList.remove('open');
+  }
+  function closeReadDirect() {
+    document.getElementById('overlay-read').classList.remove('open');
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
